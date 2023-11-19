@@ -132,6 +132,11 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 				if err != nil {
 					return
 				}
+			case dto.MetricType_UNTYPED:
+				_, err = writeRawFloat(w, metric.GetUntyped().GetValue())
+				if err != nil {
+					return
+				}
 			case dto.MetricType_SUMMARY:
 				for _, quantile := range metric.GetSummary().GetQuantile() {
 					_, err = writeRawFloat(w, quantile.GetQuantile())
