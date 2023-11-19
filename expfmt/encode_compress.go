@@ -43,7 +43,9 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 		// update encoder.metadata
 		// TODO 注意一下锁？
 		// clear original map
+		encoder.metadata.version = latestMetadataVersion
 		encoder.metadata.metricFamilyMap = make(map[uint64]MetricFamilyMetadata)
+		encoder.metadata.reverseMetricFamilyMap = make(map[string]uint64)
 		for index, metricFamily := range mfs {
 			metadata := MetricFamilyMetadata{metricFamily.GetType(), metricFamily.GetName(), metricFamily.GetHelp(), make(map[uint64]string), make(map[string]uint64)}
 			// 后续 lazy 地处理 labelMap
@@ -182,6 +184,7 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 			}
 		}
 	}
+	fmt.Printf("reqMetadataVersion: %v, holdingMetadataVersion: %v\n", reqMetadataVersion, encoder.metadata.version)
 	if reqMetadataVersion != encoder.metadata.version {
 		// write new metadata
 		w := bytes.NewBuffer(make([]byte, initialCompressedBufferSize))
