@@ -55,7 +55,7 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 	}
 	// encode
 	// 先写在 buffer 里，如果有 metadata，可以让 metadata 先写入 out，方便接收端解析
-	w := bytes.NewBuffer(make([]byte, initialCompressedBufferSize))
+	w := bytes.NewBuffer(make([]byte, 0, initialCompressedBufferSize))
 	// Try the interface upgrade. If it doesn't work, we'll use a
 	// bufio.Writer from the sync.Pool.
 	// w, ok := out.(enhancedWriter)
@@ -187,7 +187,7 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 	fmt.Printf("reqMetadataVersion: %v, holdingMetadataVersion: %v\n", reqMetadataVersion, encoder.metadata.version)
 	if reqMetadataVersion != encoder.metadata.version {
 		// write new metadata
-		w := bytes.NewBuffer(make([]byte, initialCompressedBufferSize))
+		w := bytes.NewBuffer(make([]byte, 0, initialCompressedBufferSize))
 		// MAGIC_NUM
 		_, err = w.WriteString("cprmeta")
 		if err != nil {
