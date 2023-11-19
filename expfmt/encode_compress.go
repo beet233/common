@@ -32,7 +32,7 @@ type CompressEncoder struct {
 	metadata Metadata
 }
 
-var encoder *CompressEncoder = &CompressEncoder{}
+var encoder *CompressEncoder = &CompressEncoder{Metadata{metricFamilyMap: make(map[uint64]MetricFamilyMetadata), reverseMetricFamilyMap: make(map[string]uint64)}}
 
 func GetCompressEncoder() *CompressEncoder {
 	return encoder
