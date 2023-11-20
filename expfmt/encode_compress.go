@@ -256,10 +256,38 @@ func writeRawFloat(w enhancedWriter, f float64) (int, error) {
 
 // 写入原始的 int 编码
 // TODO 改为 LEB128 编码
-func writeRawInt(w enhancedWriter, i uint64) (int, error) {
-	err := binary.Write(w, binary.LittleEndian, i)
-	if err != nil {
-		return 0, err
+func writeRawInt(w enhancedWriter, value uint64) (int, error) {
+	// err := binary.Write(w, binary.LittleEndian, i)
+	// if err != nil {
+	// 	return 0, err
+	// }
+	// return int(reflect.TypeOf(i).Size()), err
+	written := 0
+	for i := 0; i < 8; i++ {
+		// 取最低7位
+		b := byte(value & 0x7F)
+		value >>= 7
+		if value != 0 {
+			// 如果还有剩余的值，设置最高位为1
+			b |= 0x80
+		}
+		err := w.WriteByte(b)
+		if err != nil {
+			return 0, err
+		}
+		written += 1
+		if value == 0 {
+			break
+		}
 	}
-	return int(reflect.TypeOf(i).Size()), err
+	// 如果还有非 0 值，说明还需要填充一个字节的数据，最后 8 bit 直接写入
+	if value != 0 {
+		b := byte(value & 0xFF)
+		err := w.WriteByte(b)
+		if err != nil {
+			return 0, err
+		}
+		written += 1
+	}
+	return written, nil
 }
