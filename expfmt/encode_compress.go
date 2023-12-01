@@ -15,42 +15,42 @@ const (
 )
 
 type Metadata struct {
-	version                uint64
-	metricFamilyMap        map[uint64]MetricFamilyMetadata
-	reverseMetricFamilyMap map[string]uint64
+	Version                uint64
+	MetricFamilyMap        map[uint64]MetricFamilyMetadata
+	ReverseMetricFamilyMap map[string]uint64
 }
 
 type MetricFamilyMetadata struct {
-	metricType      dto.MetricType
-	name            string
-	help            string
-	labelMap        map[uint64]string
-	reverseLabelMap map[string]uint64
+	MetricType      dto.MetricType
+	Name            string
+	Help            string
+	LabelMap        map[uint64]string
+	ReverseLabelMap map[string]uint64
 }
 
 type CompressEncoder struct {
 	metadata Metadata
 }
 
-var encoder *CompressEncoder = &CompressEncoder{Metadata{metricFamilyMap: make(map[uint64]MetricFamilyMetadata), reverseMetricFamilyMap: make(map[string]uint64)}}
+var encoder *CompressEncoder = &CompressEncoder{Metadata{MetricFamilyMap: make(map[uint64]MetricFamilyMetadata), ReverseMetricFamilyMap: make(map[string]uint64)}}
 
 func GetCompressEncoder() *CompressEncoder {
 	return encoder
 }
 
 func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVersion uint64, reqMetadataVersion uint64, out io.Writer) (err error) {
-	if latestMetadataVersion != encoder.metadata.version {
+	if latestMetadataVersion != encoder.metadata.Version {
 		// update encoder.metadata
 		// TODO 注意一下锁？
 		// clear original map
-		encoder.metadata.version = latestMetadataVersion
-		encoder.metadata.metricFamilyMap = make(map[uint64]MetricFamilyMetadata)
-		encoder.metadata.reverseMetricFamilyMap = make(map[string]uint64)
+		encoder.metadata.Version = latestMetadataVersion
+		encoder.metadata.MetricFamilyMap = make(map[uint64]MetricFamilyMetadata)
+		encoder.metadata.ReverseMetricFamilyMap = make(map[string]uint64)
 		for index, metricFamily := range mfs {
 			metadata := MetricFamilyMetadata{metricFamily.GetType(), metricFamily.GetName(), metricFamily.GetHelp(), make(map[uint64]string), make(map[string]uint64)}
-			// 后续 lazy 地处理 labelMap
-			encoder.metadata.metricFamilyMap[uint64(index)] = metadata
-			encoder.metadata.reverseMetricFamilyMap[metadata.name] = uint64(index)
+			// 后续 lazy 地处理 LabelMap
+			encoder.metadata.MetricFamilyMap[uint64(index)] = metadata
+			encoder.metadata.ReverseMetricFamilyMap[metadata.Name] = uint64(index)
 		}
 	}
 	// encode
@@ -77,7 +77,7 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 		return
 	}
 	// VERSION
-	_, err = writeRawInt(w, encoder.metadata.version)
+	_, err = writeRawInt(w, encoder.metadata.Version)
 	if err != nil {
 		return
 	}
@@ -87,7 +87,7 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 		return
 	}
 	for _, metricFamily := range mfs {
-		_, err = writeRawInt(w, encoder.metadata.reverseMetricFamilyMap[metricFamily.GetName()])
+		_, err = writeRawInt(w, encoder.metadata.ReverseMetricFamilyMap[metricFamily.GetName()])
 		if err != nil {
 			return
 		}
@@ -96,7 +96,7 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 			return
 		}
 		metricType := metricFamily.GetType()
-		metricFamilyMetadata := encoder.metadata.metricFamilyMap[encoder.metadata.reverseMetricFamilyMap[metricFamily.GetName()]]
+		metricFamilyMetadata := encoder.metadata.MetricFamilyMap[encoder.metadata.ReverseMetricFamilyMap[metricFamily.GetName()]]
 		for _, metric := range metricFamily.GetMetric() {
 			// write label length
 			_, err = writeRawInt(w, uint64(len(metric.GetLabel())))
@@ -105,12 +105,12 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 			}
 			// write label pairs
 			for _, label := range metric.GetLabel() {
-				if _, ok := metricFamilyMetadata.reverseLabelMap[label.GetName()]; !ok {
+				if _, ok := metricFamilyMetadata.ReverseLabelMap[label.GetName()]; !ok {
 					// update label pairs into metadata
-					metricFamilyMetadata.labelMap[uint64(len(metricFamilyMetadata.labelMap))] = label.GetName()
-					metricFamilyMetadata.reverseLabelMap[label.GetName()] = uint64(len(metricFamilyMetadata.reverseLabelMap))
+					metricFamilyMetadata.LabelMap[uint64(len(metricFamilyMetadata.LabelMap))] = label.GetName()
+					metricFamilyMetadata.ReverseLabelMap[label.GetName()] = uint64(len(metricFamilyMetadata.ReverseLabelMap))
 				}
-				_, err = writeRawInt(w, metricFamilyMetadata.reverseLabelMap[label.GetName()])
+				_, err = writeRawInt(w, metricFamilyMetadata.ReverseLabelMap[label.GetName()])
 				if err != nil {
 					return
 				}
@@ -184,8 +184,8 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 			}
 		}
 	}
-	fmt.Printf("reqMetadataVersion: %v, holdingMetadataVersion: %v\n", reqMetadataVersion, encoder.metadata.version)
-	if reqMetadataVersion != encoder.metadata.version {
+	fmt.Printf("reqMetadataVersion: %v, holdingMetadataVersion: %v\n", reqMetadataVersion, encoder.metadata.Version)
+	if reqMetadataVersion != encoder.metadata.Version {
 		// write new metadata
 		w := bytes.NewBuffer(make([]byte, 0, initialCompressedBufferSize))
 		// MAGIC_NUM
@@ -194,43 +194,43 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 			return
 		}
 		// VERSION
-		_, err = writeRawInt(w, encoder.metadata.version)
+		_, err = writeRawInt(w, encoder.metadata.Version)
 		if err != nil {
 			return
 		}
 		// METRIC_FAMILY_LEN
-		_, err = writeRawInt(w, uint64(len(encoder.metadata.metricFamilyMap)))
+		_, err = writeRawInt(w, uint64(len(encoder.metadata.MetricFamilyMap)))
 		if err != nil {
 			return
 		}
-		for i := 0; i < len(encoder.metadata.metricFamilyMap); i++ {
-			metricFamilyMetadata := encoder.metadata.metricFamilyMap[uint64(i)]
-			_, err = writeRawInt(w, uint64(metricFamilyMetadata.metricType))
+		for i := 0; i < len(encoder.metadata.MetricFamilyMap); i++ {
+			metricFamilyMetadata := encoder.metadata.MetricFamilyMap[uint64(i)]
+			_, err = writeRawInt(w, uint64(metricFamilyMetadata.MetricType))
 			if err != nil {
 				return
 			}
-			_, err = writeRawInt(w, uint64(len(metricFamilyMetadata.name)))
+			_, err = writeRawInt(w, uint64(len(metricFamilyMetadata.Name)))
 			if err != nil {
 				return
 			}
-			_, err = w.WriteString(metricFamilyMetadata.name)
+			_, err = w.WriteString(metricFamilyMetadata.Name)
 			if err != nil {
 				return
 			}
-			_, err = writeRawInt(w, uint64(len(metricFamilyMetadata.help)))
+			_, err = writeRawInt(w, uint64(len(metricFamilyMetadata.Help)))
 			if err != nil {
 				return
 			}
-			_, err = w.WriteString(metricFamilyMetadata.help)
+			_, err = w.WriteString(metricFamilyMetadata.Help)
 			if err != nil {
 				return
 			}
-			for j := 0; j < len(metricFamilyMetadata.labelMap); j++ {
-				_, err = writeRawInt(w, uint64(len(metricFamilyMetadata.labelMap[uint64(j)])))
+			for j := 0; j < len(metricFamilyMetadata.LabelMap); j++ {
+				_, err = writeRawInt(w, uint64(len(metricFamilyMetadata.LabelMap[uint64(j)])))
 				if err != nil {
 					return
 				}
-				_, err = w.WriteString(metricFamilyMetadata.labelMap[uint64(j)])
+				_, err = w.WriteString(metricFamilyMetadata.LabelMap[uint64(j)])
 				if err != nil {
 					return
 				}
