@@ -225,6 +225,10 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 			if err != nil {
 				return
 			}
+			_, err = writeRawInt(w, uint64(len(metricFamilyMetadata.LabelMap)))
+			if err != nil {
+				return
+			}
 			for j := 0; j < len(metricFamilyMetadata.LabelMap); j++ {
 				_, err = writeRawInt(w, uint64(len(metricFamilyMetadata.LabelMap[uint64(j)])))
 				if err != nil {
