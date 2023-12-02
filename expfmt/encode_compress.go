@@ -140,6 +140,10 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 					return
 				}
 			case dto.MetricType_SUMMARY:
+				_, err = writeRawInt(w, uint64(len(metric.GetSummary().GetQuantile())))
+				if err != nil {
+					return
+				}
 				for _, quantile := range metric.GetSummary().GetQuantile() {
 					_, err = writeRawFloat(w, quantile.GetQuantile())
 					if err != nil {
@@ -150,15 +154,19 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 						return
 					}
 				}
-				_, err = writeRawInt(w, metric.GetSummary().GetSampleCount())
-				if err != nil {
-					return
-				}
 				_, err = writeRawFloat(w, metric.GetSummary().GetSampleSum())
 				if err != nil {
 					return
 				}
+				_, err = writeRawInt(w, metric.GetSummary().GetSampleCount())
+				if err != nil {
+					return
+				}
 			case dto.MetricType_HISTOGRAM:
+				_, err = writeRawInt(w, uint64(len(metric.GetHistogram().GetBucket())))
+				if err != nil {
+					return
+				}
 				for _, bucket := range metric.GetHistogram().GetBucket() {
 					_, err = writeRawFloat(w, bucket.GetUpperBound())
 					if err != nil {
@@ -169,11 +177,11 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 						return
 					}
 				}
-				_, err = writeRawInt(w, metric.GetHistogram().GetSampleCount())
+				_, err = writeRawFloat(w, metric.GetHistogram().GetSampleSum())
 				if err != nil {
 					return
 				}
-				_, err = writeRawFloat(w, metric.GetHistogram().GetSampleSum())
+				_, err = writeRawInt(w, metric.GetHistogram().GetSampleCount())
 				if err != nil {
 					return
 				}
