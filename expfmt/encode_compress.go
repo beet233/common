@@ -271,7 +271,7 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 	if enableStringPool {
 		w := bytes.NewBuffer(make([]byte, 0, initialCompressedBufferSize))
 		for i := 0; i < len(stringPool); i++ {
-			_, err := writeRawInt(w, uint64(len(stringPool[uint64(i)])))
+			_, err = writeRawInt(w, uint64(len(stringPool[uint64(i)])))
 			if err != nil {
 				return
 			}
