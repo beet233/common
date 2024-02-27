@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	enableStringPool            = true
 	initialCompressedBufferSize = 1024
 )
 
@@ -86,6 +87,8 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 	if err != nil {
 		return
 	}
+	stringPool := make(map[uint64]string)
+	reverseStringPool := make(map[string]uint64)
 	for _, metricFamily := range mfs {
 		_, err = writeRawInt(w, encoder.metadata.ReverseMetricFamilyMap[metricFamily.GetName()])
 		if err != nil {
@@ -114,13 +117,24 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 				if err != nil {
 					return
 				}
-				_, err = writeRawInt(w, uint64(len(label.GetValue())))
-				if err != nil {
-					return
-				}
-				_, err = w.WriteString(label.GetValue())
-				if err != nil {
-					return
+				if enableStringPool {
+					if _, ok := reverseStringPool[label.GetValue()]; !ok {
+						stringPool[uint64(len(stringPool))] = label.GetValue()
+						reverseStringPool[label.GetValue()] = uint64(len(reverseStringPool))
+					}
+					_, err = writeRawInt(w, reverseStringPool[label.GetValue()])
+					if err != nil {
+						return
+					}
+				} else {
+					_, err = writeRawInt(w, uint64(len(label.GetValue())))
+					if err != nil {
+						return
+					}
+					_, err = w.WriteString(label.GetValue())
+					if err != nil {
+						return
+					}
 				}
 			}
 			switch metricType {
@@ -193,6 +207,7 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 		}
 	}
 	fmt.Printf("reqMetadataVersion: %v, holdingMetadataVersion: %v\n", reqMetadataVersion, encoder.metadata.Version)
+	// 依次是元数据 字符串字典 编码数据
 	if reqMetadataVersion != encoder.metadata.Version {
 		// write new metadata
 		w := bytes.NewBuffer(make([]byte, 0, initialCompressedBufferSize))
@@ -246,6 +261,23 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 				if err != nil {
 					return
 				}
+			}
+		}
+		_, err = w.WriteTo(out)
+		if err != nil {
+			return
+		}
+	}
+	if enableStringPool {
+		w := bytes.NewBuffer(make([]byte, 0, initialCompressedBufferSize))
+		for i := 0; i < len(stringPool); i++ {
+			_, err := writeRawInt(w, uint64(len(stringPool[uint64(i)])))
+			if err != nil {
+				return
+			}
+			_, err = w.WriteString(stringPool[uint64(i)])
+			if err != nil {
+				return
 			}
 		}
 		_, err = w.WriteTo(out)
