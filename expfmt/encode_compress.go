@@ -270,6 +270,14 @@ func (encoder *CompressEncoder) Encode(mfs []*dto.MetricFamily, latestMetadataVe
 	}
 	if enableStringPool {
 		w := bytes.NewBuffer(make([]byte, 0, initialCompressedBufferSize))
+		_, err = w.WriteString("cprdict")
+		if err != nil {
+			return
+		}
+		_, err = writeRawInt(w, uint64(len(stringPool)))
+		if err != nil {
+			return
+		}
 		for i := 0; i < len(stringPool); i++ {
 			_, err = writeRawInt(w, uint64(len(stringPool[uint64(i)])))
 			if err != nil {
